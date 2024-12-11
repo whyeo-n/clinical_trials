@@ -11,7 +11,7 @@ URL = 'http://apis.data.go.kr/1471000/MdcinClincTestInfoService02/getMdcinClincT
 title = st.text_input('Title')
 date = st.text_input('Approval Date')
 
-if st.button('Search'):
+if st.button('Search', key='serch_button'):
     params = {
         'serviceKey': st.secrets['DECODED_API_KEY'],
         'clinic_exam_title': title,
@@ -60,7 +60,7 @@ if st.button('Search'):
         # Exapmle Dataframe
         st.dataframe(df)
         st.download_button(
-            label="Download",
+            label="download_button",
             data=convert_df(df),
             file_name=f'clinical_trials_info.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -68,6 +68,7 @@ if st.button('Search'):
 
         # Download Button
         st.download_button(
+            key='download_button',
             label="Download",
             data=convert_df(df),
             file_name=f'clinical_trials_info.xlsx',
