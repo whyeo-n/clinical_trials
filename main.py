@@ -59,6 +59,12 @@ if st.button('Search'):
 
         # Exapmle Dataframe
         st.dataframe(df)
+        st.download_button(
+            label="Download",
+            data=convert_df(df),
+            file_name=f'clinical_trials_info.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
 
         # Download Button
         st.download_button(
