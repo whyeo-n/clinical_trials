@@ -2,3 +2,4 @@
 /.streamlit
 *.xlsx
 *.ipynb
+/module/__pycache__
