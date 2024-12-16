@@ -15,3 +15,7 @@ STUDY_DETAILS_COLUMN_NAME = [
     'Primary Efficacy Endpoint', 'Secondary Efficacy Endpoint', 'Period of the IP Administration',
     'Method of the IP Administration', 'Study Status', 'Clinical Trial ID'
 ]
+
+BASE_URL = 'http://apis.data.go.kr/1471000'
+
+NUM_OF_ROWS = 100
