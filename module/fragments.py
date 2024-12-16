@@ -1,9 +1,12 @@
 import streamlit as st
 
 from module.utils import *
+from module.constants import *
 
 @st.fragment
 def medication_clinical_trial_search():
+    st.title('Clinical Trial Information :blue[Finder]')
+    st.write('식품의약품 안전처의 의약품 임상시험 승인 정보를 검색하려면 :blue[임상시험 제목 및/또는 승인년월일]을 입력하고 버튼을 클릭하세요')
     st.header('의약품 임상시험 :blue[승인 정보 조회] (2012~)')
     columns = st.columns(2)
     form = columns[0].form(key='medication_clinical_trial_info_search')
@@ -15,7 +18,7 @@ def medication_clinical_trial_search():
     form_columns[0].text_input('Protocol Title Keyword', key='title')
     form_columns[1].text_input('IND Approval Date (Available Input: :blue[YYYY] | :blue[YYYY]:orange[MM] | :blue[YYYY]:orange[MM]:green[DD])', placeholder='YYYYMMDD', max_chars=8, key='date')
 
-    dataframe = pd.DataFrame(columns=STUDY_COLUMN_NAME)
+    dataframe = pd.DataFrame(columns=MEDICATION_STUDY_COLUMN_NAME)
 
     if form.form_submit_button('Search'):
         try: 
@@ -49,7 +52,7 @@ def medication_clinical_trial_search():
                         progress_bar.progress(1.0, text=f'Done')
                     
                     dataframe = pd.DataFrame(study_infos_list).reset_index(drop=True)
-                    dataframe.columns = STUDY_COLUMN_NAME
+                    dataframe.columns = MEDICATION_STUDY_COLUMN_NAME
 
             # Exapmle Dataframe
             columns[0].dataframe(dataframe)
@@ -63,11 +66,11 @@ def medication_clinical_trial_search():
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
             # top10_trial_count_per_sponsor_fig
-            top10_trial_count_per_sponsor_fig = generate_top10_sponsor_plot(dataframe)
+            top10_trial_count_per_sponsor_fig = generate_top10_sponsor_plot(dataframe, x='Protocol Title', y='Sponsor')
             tabs[0].plotly_chart(top10_trial_count_per_sponsor_fig)
 
             # top10_trial_count_per_site_fig
-            top10_trial_count_per_site_fig = generate_top10_site_plot(dataframe)
+            top10_trial_count_per_site_fig = generate_top10_site_plot(dataframe, x='count', y='value')
             tabs[1].plotly_chart(top10_trial_count_per_site_fig)
 
             # 상세항목 검색
@@ -103,7 +106,7 @@ def medication_clinical_trial_details_search(dataframe:pd.DataFrame):
 
 
         details_dataframe = pd.DataFrame(study_infos_list)
-        details_dataframe.columns = STUDY_DETAILS_COLUMN_NAME
+        details_dataframe.columns = MEDICATION_STUDY_DETAILS_COLUMN_NAME
 
         progress_bar.progress(1.0, text='Done')
 
@@ -117,9 +120,64 @@ def medication_clinical_trial_details_search(dataframe:pd.DataFrame):
         )
 
         # top10_trial_count_per_developer_fig
-        top10_trial_count_per_developer_fig = generate_top10_developer_plot(details_dataframe)
+        top10_trial_count_per_developer_fig = generate_top10_developer_plot(details_dataframe, x='count', y='Original Developer of the IP')
         tabs[0].plotly_chart(top10_trial_count_per_developer_fig)
 
         # top10_trial_count_per_indication_fig
         top10_trial_count_per_target_disease_fig = generate_top10_disease_plot(details_dataframe)
         tabs[1].plotly_chart(top10_trial_count_per_target_disease_fig)
+
+@st.fragment
+def medical_device_clinical_trial_search():
+    st.title('Clinical Trial Information :blue[Finder]')
+    st.write('식품의약품 안전처의 의료기기 임상시험 승인 정보를 검색하려면 :blue[임상시험 제목 및/또는 승인년월일]을 입력하고 버튼을 클릭하세요')
+    st.header('의료기기 임상시험 :blue[승인 정보 조회] (2003~)')
+    columns = st.columns(2)
+    form = columns[0].form(key='medication_clinical_trial_info_search')
+    tabs = columns[1].tabs(['Top 10 Sponsor', 'Top 10 Manufacturer'])
+    
+    form_columns = form.columns(2)
+    progress_bar = form.progress(0.00, text='Idle...')
+    
+    # form_columns[0].text_input('Protocol Title Keyword', key='title')
+    # form_columns[1].text_input('IND Approval Date (Available Input: :blue[YYYY] | :blue[YYYY]:orange[MM] | :blue[YYYY]:orange[MM]:green[DD])', placeholder='YYYYMMDD', max_chars=8, key='date')
+
+    if form.form_submit_button('Search'):
+        try: 
+            response_body_dict = call_api_MdeqClncTestPlanAprvAplyDtlService01(initial=True)
+            total_count = response_body_dict.get('totalCount')
+            max_page = int(ceil(total_count/NUM_OF_ROWS))
+            study_infos_list = response_body_dict.get('items')
+            progress_bar.progress(1/max_page, text=f'Process 1/{max_page}')
+
+
+            for i in range(2, max_page+1):
+                response_body_dict = call_api_MdeqClncTestPlanAprvAplyDtlService01(initial=False, iter=i)
+                study_infos_list.extend(response_body_dict.get('items'))
+                progress_bar.progress(i/max_page, text=f'Process {i}/{max_page}')
+
+
+            dataframe = pd.DataFrame(study_infos_list)
+            dataframe.columns = MEDICAL_DEVICE_STUDY_COLUMN_NAME
+            progress_bar.progress(1.00, text='Done')
+            form.dataframe(dataframe)
+
+            st.download_button(
+                label='Download',
+                key="clinical_trial_details_info_excel_download_button",
+                data=convert_df(dataframe),
+                file_name=f'clinical_trial_details_info.xlsx',
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+
+            # top10_trial_count_per_sponsor_fig
+            top10_trial_count_per_sponsor_fig = generate_top10_sponsor_plot(dataframe, x='Protocol Title', y='Sponsor')
+            tabs[0].plotly_chart(top10_trial_count_per_sponsor_fig)
+
+            # top10_trial_count_per_manufecturer_fig
+            top10_trial_count_per_developer_fig = generate_top10_developer_plot(dataframe, x='count', y='Manufacturer Name')
+            tabs[1].plotly_chart(top10_trial_count_per_developer_fig)
+
+
+        except Exception as e:
+            st.toast(f':red[Error Occured]: {e}')
