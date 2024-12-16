@@ -1,3 +1,5 @@
+from time import sleep
+
 import streamlit as st
 
 from module.utils import *
@@ -6,8 +8,8 @@ from module.constants import *
 @st.fragment
 def medication_clinical_trial_search():
     st.title('Clinical Trial Information :blue[Finder]')
-    st.write('식품의약품 안전처의 의약품 임상시험 승인 정보를 검색하려면 :blue[임상시험 제목 및/또는 승인년월일]을 입력하고 버튼을 클릭하세요')
-    st.header('의약품 임상시험 :blue[승인 정보 조회] (2012~)')
+    st.write('식품의약품 안전처의 의약품 임상시험 승인 정보를 검색하려면 :blue[임상시험 제목 및/또는 승인년월일]을 입력하고 :blue[버튼]을 클릭하세요.')
+    st.header(':blue[의약품] 임상시험 :blue[승인 정보 조회] (2012~)')
     columns = st.columns(2)
     form = columns[0].form(key='medication_clinical_trial_info_search')
     tabs = columns[1].tabs(['Top 10 Sponsor', 'Top 10 Site'])
@@ -129,9 +131,9 @@ def medication_clinical_trial_details_search(dataframe:pd.DataFrame):
 
 @st.fragment
 def medical_device_clinical_trial_search():
-    st.title('Clinical Trial Information :blue[Finder]')
-    st.write('식품의약품 안전처의 의료기기 임상시험 승인 정보를 검색하려면 :blue[임상시험 제목 및/또는 승인년월일]을 입력하고 버튼을 클릭하세요')
-    st.header('의료기기 임상시험 :blue[승인 정보 조회] (2003~)')
+    st.title('Clinical Trial Information :green[Finder]')
+    st.write('식품의약품 안전처의 의료기기 임상시험 승인 정보를 검색하려면 :green[버튼]을 클릭하세요.')
+    st.header(':green[의료기기] 임상시험 :green[승인 정보 조회] (2003~)')
     columns = st.columns(2)
     form = columns[0].form(key='medication_clinical_trial_info_search')
     tabs = columns[1].tabs(['Top 10 Sponsor', 'Top 10 Manufacturer'])
@@ -165,7 +167,7 @@ def medical_device_clinical_trial_search():
             st.download_button(
                 label='Download',
                 key="clinical_trial_details_info_excel_download_button",
-                data=convert_df(dataframe),
+                data=convert_df(dataframe.sort_values('Approval Date', ascending=False)),
                 file_name=f'clinical_trial_details_info.xlsx',
                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
