@@ -6,8 +6,7 @@ import pandas as pd
 import plotly.express as px
 
 from math import ceil
-from time import sleep
-from module.constants import STUDY_COLUMN_NAME, STUDY_DETAILS_COLUMN_NAME, BASE_URL, NUM_OF_ROWS
+from module.constants import *
 
 @st.cache_data
 def convert_df(df):
@@ -33,14 +32,14 @@ def get_request(url, params):
 
 
 @st.cache_data
-def generate_top10_sponsor_plot(df):
-    df = df.groupby('Sponsor', as_index=False).count()[['Sponsor', 'Protocol Title']].nlargest(10, 'Protocol Title').sort_values('Protocol Title', ascending=True)
+def generate_top10_sponsor_plot(df, x:str, y:str):
+    df = df.groupby(y, as_index=False).count()[[y, 'Protocol Title']].nlargest(10, 'Protocol Title').sort_values('Protocol Title', ascending=True)
     colors =  ["lightgray" if count != max(df['Protocol Title']) else "#ffaa00" for count in df['Protocol Title']]
     fig = px.bar(
         df,
         title='Top 10 Sponsors',
-        x='Protocol Title',
-        y='Sponsor',
+        x=x,
+        y=y,
         orientation='h',
     )
 
@@ -51,14 +50,14 @@ def generate_top10_sponsor_plot(df):
     return fig
 
 @st.cache_data
-def generate_top10_site_plot(df):
+def generate_top10_site_plot(df, x:str, y:str):
     df = df['Site Name'].str.split(" :", expand=True).melt().dropna().value_counts('value').to_frame().reset_index().nlargest(10, 'count').sort_values('count', ascending=True)
     colors =  ["lightgray" if count != max(df['count']) else "#ffaa00" for count in df['count']]
     fig = px.bar(
         df,
         title='Top 10 Site',
-        x='count',
-        y='value',
+        x=x,
+        y=y,
         orientation='h',
     )
 
@@ -69,14 +68,14 @@ def generate_top10_site_plot(df):
     return fig
 
 @st.cache_data
-def generate_top10_developer_plot(df):
-    df = df['Original Developer of the IP'].value_counts().to_frame().reset_index().nlargest(10, 'count').sort_values('count', ascending=True)
+def generate_top10_developer_plot(df, x:str, y: str):
+    df = df[y].value_counts().to_frame().reset_index().nlargest(10, 'count').sort_values('count', ascending=True)
     colors =  ["lightgray" if count != max(df['count']) else "#ffaa00" for count in df['count']]
     fig = px.bar(
         df,
         title='Top 10 Developer',
-        x='count',
-        y='Original Developer of the IP',
+        x=x,
+        y=y,
         orientation='h',
     )
 
@@ -137,3 +136,27 @@ def call_api_ClncExamPlanDtlService2(clinical_study_id:str):
     response_body_dict = get_request(url, params=params)
 
     return response_body_dict
+
+
+def call_api_MdeqClncTestPlanAprvAplyDtlService01(initial:bool=False, iter:int=1):
+    url = BASE_URL + '/MdeqClncTestPlanAprvAplyDtlService01/getMdeqClncTestPlanAprvAplyDtlInq01'
+    # url = BASE_URL + '/MdeqClncTestPlanAprvAplyListService/getMdeqClncTestPlanAprvAplyListInq'
+    if initial:
+        params = {
+            'serviceKey': st.secrets['DECODED_API_KEY'],
+            'pageNo': 1,
+            'numOfRows': 100,
+            'type': 'json',
+            }
+        
+        return get_request(url, params=params)
+        
+    else:
+        params = {
+            'serviceKey': st.secrets['DECODED_API_KEY'],
+            'pageNo': iter,
+            'numOfRows': 100,
+            'type': 'json',
+            }
+
+        return get_request(url, params=params)
