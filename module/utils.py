@@ -17,7 +17,7 @@ def convert_df(df):
 
     return output
 
-def get_request(url, params):
+def get_request(url:str, params:dict):
     response = requests.get(url, params=params)
 
     if response.status_code != 200:

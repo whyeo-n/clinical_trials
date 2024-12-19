@@ -183,3 +183,9 @@ def medical_device_clinical_trial_search():
 
         except Exception as e:
             st.toast(f':red[Error Occured]: {e}')
+
+
+def fetch_api_data(url:str, params:dict):
+    response_body_dict = get_request(url, params)
+
+    response_body_dict
