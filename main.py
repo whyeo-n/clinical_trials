@@ -1,21 +1,22 @@
+from datetime import datetime
+
+import pandas as pd
 import streamlit as st
 from st_files_connection import FilesConnection
 
-from module.fragments import medication_clinical_trial_search, medical_device_clinical_trial_search
+from module.fragments import medication_tirals
+from module.constants import GCS_BUCKET_NAME, MEDICATION_STUDY_COLUMN_NAME
 
+today = datetime.now().isoformat()
 st.set_page_config(layout='wide')
 
-conn = st.connection('gcs', type=FilesConnection)
-# df = conn.read('streamlit-mfds-clinical-trials/myfile.csv', input_format='csv', ttl=600)
 
-pages_dict = {
-    'Medication': medication_clinical_trial_search,
-    'Medical Device': medical_device_clinical_trial_search
-}
+# Session State Initialization
+if 'medication_api' not in st.session_state:
+    st.session_state['medication_api'] = False
+if 'medication_detail_api' not in st.session_state:
+    st.session_state['medication_detail'] = False
+if 'device_api' not in st.session_state:
+    st.session_state['device_api'] = False
 
-try:
-    selected_page = st.sidebar.selectbox('Select', options=pages_dict.keys())
-    pages_dict[selected_page]()
-
-except Exception as e:
-    st.toast(f':red[Error Occured]: {e}')
+medication_tirals(today)

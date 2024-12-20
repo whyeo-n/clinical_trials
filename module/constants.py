@@ -1,4 +1,7 @@
-MEDICATION_STUDY_COLUMN_NAME = ['Sponsor', 'IND Approval Date', 'Site Name', 'IP Name', 'Protocol Title', 'Phase', 'Clinical Trial ID']
+MEDICATION_STUDY_COLUMN_NAME = [
+    'Sponsor', 'IND Approval Date', 'Site Name', 'IP Name', 
+    'Protocol Title', 'Phase', 'Clinical Trial ID'
+]
 MEDICATION_STUDY_DETAILS_COLUMN_NAME = [
     'Sponsor', 'President of the Sponsor', 'Address of the Sponsor', 
     'Original Developer of the IP', 'Nationality of the Original Developer', 
@@ -20,8 +23,12 @@ BASE_URL = 'http://apis.data.go.kr/1471000'
 
 NUM_OF_ROWS = 100
 
-MEDICAL_DEVICE_STUDY_COLUMN_NAME = ['Plan Approval No', 'Clinical Trial Approval No', 'Approval Date', 'Manufacturer Name',
-                                    'Manufacturer Zipcode', 'Sponsor', 'Product Name', 'Protocol Title', 'Category ID', 
-                                    'Clinical Trial ID Code', 'Clinical Trial ID Name', 'Clinical Trial Detail Code', 
-                                    'Clinical Trial Detail Name', 'Forein Approval', 'Medical Device Category No', 
-                                    'Information Release', 'Deleted', 'BRNO']
+MEDICAL_DEVICE_STUDY_COLUMN_NAME = [
+    'Plan Approval No', 'Clinical Trial Approval No', 'Approval Date', 'Manufacturer Name',
+    'Manufacturer Zipcode', 'Sponsor', 'Product Name', 'Protocol Title', 'Category ID', 
+    'Clinical Trial ID Code', 'Clinical Trial ID Name', 'Clinical Trial Detail Code', 
+    'Clinical Trial Detail Name', 'Forein Approval', 'Medical Device Category No', 
+    'Information Release', 'Deleted', 'BRNO'
+]
+
+GCS_BUCKET_NAME = 'streamlit-mfds-clinical-trials'
