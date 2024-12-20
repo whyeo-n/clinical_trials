@@ -35,7 +35,7 @@ def get_request(url: str, params: dict) -> dict:
 def fetch_medication_trial_data():
     """Fetch and return all medication trial data from the API."""
     
-    url = BASE_URL + '/MdcinClincTestInfoService02/getMdcinClincTestInfoList02'
+    url = f'{BASE_URL}/MdcinClincTestInfoService02/getMdcinClincTestInfoList02'
     
     # Set up the parameters for the request
     params = {
@@ -81,7 +81,48 @@ def fetch_medication_trial_data():
             st.toast(f':orange[No items found for page {page_no}.]', icon="⚠️")
     
     # Return the collected items as a DataFrame
-    return pd.DataFrame(total_items)
+    output_dataframe = pd.DataFrame(total_items)
+    output_dataframe.columns = MEDICATION_STUDY_COLUMN_NAME
+    print(output_dataframe)
+    return output_dataframe
+
+def fetch_medication_details_data(dataframe: pd.DataFrame):
+    """Fetch and return details data from the API."""
+    
+    url = f'{BASE_URL}/ClncExamPlanDtlService2/getClncExamPlanDtlInq2'
+    
+    # Set up the parameters for the request
+    params = {
+        'serviceKey': st.secrets['DECODED_API_KEY'],
+        'pageNo': 1,
+        'numOfRows': 100,
+        'type': 'json',
+        }
+
+    # Initialize the list to store all items
+    total_items = []
+
+    # Fetch data for each ids
+    for i in dataframe.index:
+        params['CLNC_TEST_SN'] = dataframe.loc[i,'Clinical Trial ID']
+        
+        response_body_dict = get_request(url, params)
+        
+        if response_body_dict is None:
+            st.toast(f':red[Failed to fetch data for {params['CLNC_TEST_SN']}. Check the API or network.]', icon="🚨")
+            continue  # Skip to the next page if the request fails
+        
+        items = response_body_dict.get('items', [])
+        
+        if items:  # Only add if there are items
+            total_items.extend(items)
+        else:
+            st.toast(f':orange[No items found for page {params['CLNC_TEST_SN']}.]', icon="⚠️")
+    
+    # Return the collected items as a DataFrame
+    output_dataframe = pd.DataFrame(total_items).fillna('None')
+    output_dataframe.columns = MEDICATION_STUDY_DETAILS_COLUMN_NAME
+    return output_dataframe
 
 
 def update_data(dataframe: pd.DataFrame, conn: FilesConnection, file_path: str):

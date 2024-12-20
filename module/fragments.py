@@ -37,36 +37,49 @@ def medication_tirals(today:datetime):
             columns[0].info('Every data is up to date!')
 
     medication_trial_df = conn.read(f'{GCS_BUCKET_NAME}/medication_trial_info.json', input_format='jsonl', dtype=str)
-    medication_trial_df.columns = MEDICATION_STUDY_COLUMN_NAME
 
     columns[0].dataframe(medication_trial_df)
+    
+    # Calling API done
+    st.session_state['medication_api'] = 'DONE'
 
-    form = columns[0].form(key='handle_medication_trial')
-    form_columns = form.columns(2)
-    form_columns[0].text_input('Sponsor', key='sponsor', placeholder='삼진제약')
-    form_columns[0].text_input(
-        '''IND Approval Date (Available Input: :blue[YYYY] | 
-        :blue[YYYY]:orange[MM] | :blue[YYYY]:orange[MM]:green[DD])''', 
-        key='date', 
-        max_chars=8, 
-        placeholder='YYYYMMDD')
-    form_columns[1].text_input('Site', key='site', placeholder='서울대학교병원')
-    form_columns[1].text_input('Protocol Title', key='title', placeholder='급성')
-    if form.form_submit_button('Set'):
+    # Displaying the filter form
+    if st.session_state['medication_api'] == 'DONE':
+        form = columns[0].form(key='filter_medication_trial')
+        form_columns = form.columns(2)
+        form_columns[0].text_input('Sponsor', key='sponsor', placeholder='삼진제약')
+        form_columns[0].text_input(
+            '''IND Approval Date (Available Input: :blue[YYYY] | 
+            :blue[YYYY]:orange[MM] | :blue[YYYY]:orange[MM]:green[DD])''', 
+            key='date', 
+            max_chars=8, 
+            placeholder='YYYYMMDD')
+        form_columns[1].text_input('Site', key='site', placeholder='서울대학교병원')
+        form_columns[1].text_input('Protocol Title', key='title', placeholder='급성')
+        submit_button = form.form_submit_button('Filter')
+        
+        if submit_button:
+            with st.spinner():
+                sponsor = st.session_state['sponsor']
+                date = st.session_state['date']
+                site = st.session_state['site']
+                title = st.session_state['title']
+                st.session_state['medication_trial_df'] = medication_trial_df[
+                    medication_trial_df['Sponsor'].str.contains(sponsor)
+                    &medication_trial_df['IND Approval Date'].str.contains(date)
+                    &medication_trial_df['Site Name'].str.contains(site)
+                    &medication_trial_df['Protocol Title'].str.contains(title)
+                    ]
+                columns[0].dataframe(st.session_state['medication_trial_df'])
+
+@st.fragment
+def medication_details():
+    columns = st.columns([2,1])
+    details_button = columns[0].button('Search Details')
+    if details_button:
         with st.spinner():
-            sponsor = st.session_state['sponsor']
-            date = st.session_state['date']
-            site = st.session_state['site']
-            title = st.session_state['title']
-            medication_trial_df = medication_trial_df[
-                medication_trial_df['Sponsor'].str.contains(sponsor)
-                &medication_trial_df['IND Approval Date'].str.contains(date)
-                &medication_trial_df['Site Name'].str.contains(site)
-                &medication_trial_df['Protocol Title'].str.contains(title)
-                ]
-            columns[0].dataframe(medication_trial_df)
-
-
+            medication_details_df = fetch_medication_details_data(dataframe=st.session_state['medication_trial_df'])
+            columns[0].dataframe(medication_details_df)
 # @st.fragment
 # def medication_clinical_trial_search():
 #     st.title('Clinical Trial Information :blue[Finder]')
@@ -82,7 +95,6 @@ def medication_tirals(today:datetime):
 #     form_columns[0].text_input('Protocol Title Keyword', key='title')
 #     form_columns[1].text_input('IND Approval Date (Available Input: :blue[YYYY] | :blue[YYYY]:orange[MM] | :blue[YYYY]:orange[MM]:green[DD])', placeholder='YYYYMMDD', max_chars=8, key='date')
 
-#     dataframe = pd.DataFrame(columns=MEDICATION_STUDY_COLUMN_NAME)
 
 #     if form.form_submit_button('Search'):
 #         try: 
@@ -116,7 +128,6 @@ def medication_tirals(today:datetime):
 #                         progress_bar.progress(1.0, text=f'Done')
                     
 #                     dataframe = pd.DataFrame(study_infos_list).reset_index(drop=True)
-#                     dataframe.columns = MEDICATION_STUDY_COLUMN_NAME
 
 #             # Exapmle Dataframe
 #             columns[0].dataframe(dataframe)
