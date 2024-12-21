@@ -24,11 +24,11 @@ BASE_URL = 'http://apis.data.go.kr/1471000'
 NUM_OF_ROWS = 100
 
 MEDICAL_DEVICE_STUDY_COLUMN_NAME = [
-    'Plan Approval No', 'Clinical Trial Approval No', 'Approval Date', 'Manufacturer Name',
+    'Plan Approval No', 'Clinical Trial Approval No', 'IND Approval Date', 'Manufacturer',
     'Manufacturer Zipcode', 'Sponsor', 'Product Name', 'Protocol Title', 'Category ID', 
     'Clinical Trial ID Code', 'Clinical Trial ID Name', 'Clinical Trial Detail Code', 
-    'Clinical Trial Detail Name', 'Forein Approval', 'Medical Device Category No', 
-    'Information Release', 'Deleted', 'BRNO'
+    'Clinical Trial Detail Name', 'Forein Approval', 'Device ID', 
+    'Information Release', 'Deleted', 'Unknown'
 ]
 
 GCS_BUCKET_NAME = 'streamlit-mfds-clinical-trials'

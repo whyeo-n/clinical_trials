@@ -9,6 +9,7 @@ import plotly.express as px
 from math import ceil
 from module.constants import *
 
+@st.cache_data
 def get_request(url: str, params: dict) -> dict:
     """Make a GET request and return the response body if successful."""
     
@@ -23,20 +24,20 @@ def get_request(url: str, params: dict) -> dict:
         return response.json().get('body', {})
     
     except requests.exceptions.HTTPError as http_err:
-        st.toast(f':red[API Call Failed] HTTP error occurred: {http_err}', icon="🚨")
+        st.error(f':red[API Call Failed] HTTP error occurred: {http_err}', icon="🚨")
     except requests.exceptions.RequestException as req_err:
-        st.toast(f':red[API Call Failed] Request error occurred: {req_err}', icon="🚨")
+        st.error(f':red[API Call Failed] Request error occurred: {req_err}', icon="🚨")
     except Exception as err:
-        st.toast(f':red[API Call Failed] An unexpected error occurred: {err}', icon="🚨")
+        st.error(f':red[API Call Failed] An unexpected error occurred: {err}', icon="🚨")
     
     # Return None if an error occurred
     return None
 
+# @st.cache_data
 def fetch_medication_trial_data():
     """Fetch and return all medication trial data from the API."""
-    
     url = f'{BASE_URL}/MdcinClincTestInfoService02/getMdcinClincTestInfoList02'
-    
+
     # Set up the parameters for the request
     params = {
         'serviceKey': st.secrets['DECODED_API_KEY'],
@@ -52,40 +53,101 @@ def fetch_medication_trial_data():
     response_body_dict = get_request(url, params)
 
     if response_body_dict is None:
-        st.toast(':red[Failed to fetch initial data. Please check your API.]', icon="🚨")
+        st.error(':red[Failed to fetch initial data. Please check your API.]', icon="🚨")
         return pd.DataFrame()  # Return an empty DataFrame if the request fails
-    
+
     totalCount = response_body_dict.get('totalCount', 0)
     if totalCount == 0:
-        st.toast(':orange[No data available from the API.]', icon="⚠️")
+        st.error(':orange[No data available from the API.]', icon="⚠️")
         return pd.DataFrame()  # Return an empty DataFrame if no data is available
 
     num_of_pages = ceil(totalCount / 100)  # Calculate the number of pages
 
+    progress_bar = st.progress(value=0, text='Fetching start')
     # Fetch data from all pages
     for page_no in range(1, num_of_pages + 1):
+        progress_bar.progress(page_no / num_of_pages, text=f'Fetching data from page {page_no}...')
         params['pageNo'] = page_no
         params['numOfRows'] = 100  # Fetch 100 items per page
-        
+
         response_body_dict = get_request(url, params)
-        
+
         if response_body_dict is None:
-            st.toast(f':red[Failed to fetch data for page {page_no}. Check the API or network.]', icon="🚨")
+            st.error(f':red[Failed to fetch data for page {page_no}. Check the API or network.]', icon="🚨")
             continue  # Skip to the next page if the request fails
         
         items = response_body_dict.get('items', [])
-        
+
         if items:  # Only add if there are items
             total_items.extend(items)
         else:
-            st.toast(f':orange[No items found for page {page_no}.]', icon="⚠️")
+            st.error(f':orange[No items found for page {page_no}.]', icon="⚠️")
     
+    progress_bar.progress(1.0, text=f'Fetching complete.')
+
     # Return the collected items as a DataFrame
     output_dataframe = pd.DataFrame(total_items)
     output_dataframe.columns = MEDICATION_STUDY_COLUMN_NAME
-    print(output_dataframe)
     return output_dataframe
 
+def fetch_device_trial_data():
+    """Fetch and return all medical device trial data from the API."""
+    
+    st.write('Setting URL and parameters...')
+    url = f'{BASE_URL}/MdeqClncTestPlanAprvAplyDtlService01/getMdeqClncTestPlanAprvAplyDtlInq01'
+
+    # Set up the parameters for the request
+    params = {
+        'serviceKey': st.secrets['DECODED_API_KEY'],
+        'type': 'json',
+    }
+
+    # Initialize the list to store all items
+    total_items = []
+
+    # Fetch the total count first (to determine the number of pages)
+    params['pageNo'] = 1
+    params['numOfRows'] = 1  # Fetch 1 item to get the total count
+    response_body_dict = get_request(url, params)
+
+    if response_body_dict is None:
+        st.error(':red[Failed to fetch initial data. Please check your API.]', icon="🚨")
+        return pd.DataFrame()  # Return an empty DataFrame if the request fails
+
+    totalCount = response_body_dict.get('totalCount', 0)
+    if totalCount == 0:
+        st.error(':orange[No data available from the API.]', icon="⚠️")
+        return pd.DataFrame()  # Return an empty DataFrame if no data is available
+
+    num_of_pages = ceil(totalCount / 100)  # Calculate the number of pages
+
+    progress_bar = st.progress(value=0, text='Fetching start')
+    # Fetch data from all pages
+    for page_no in range(1, num_of_pages + 1):
+        progress_bar.progress(page_no / num_of_pages, text=f'Fetching data from page {page_no}...')
+        params['pageNo'] = page_no
+        params['numOfRows'] = 100  # Fetch 100 items per page
+
+        response_body_dict = get_request(url, params)
+
+        if response_body_dict is None:
+            st.error(f':red[Failed to fetch data for page {page_no}. Check the API or network.]', icon="🚨")
+            continue  # Skip to the next page if the request fails
+        
+        items = response_body_dict.get('items', [])
+
+        if items:  # Only add if there are items
+            total_items.extend(items)
+        else:
+            st.error(f':orange[No items found for page {page_no}.]', icon="⚠️")
+    progress_bar.progress(1.0, text='Fetching complete')
+
+    # Return the collected items as a DataFrame
+    output_dataframe = pd.DataFrame(total_items)
+    output_dataframe.columns = MEDICAL_DEVICE_STUDY_COLUMN_NAME
+    return output_dataframe
+
+# @st.cache_data
 def fetch_medication_details_data(dataframe: pd.DataFrame):
     """Fetch and return details data from the API."""
     
@@ -124,7 +186,6 @@ def fetch_medication_details_data(dataframe: pd.DataFrame):
     output_dataframe.columns = MEDICATION_STUDY_DETAILS_COLUMN_NAME
     return output_dataframe
 
-
 def update_data(dataframe: pd.DataFrame, conn: FilesConnection, file_path: str):
     """Function to save DataFrame to Json in GCS."""
     
@@ -134,11 +195,11 @@ def update_data(dataframe: pd.DataFrame, conn: FilesConnection, file_path: str):
             # Save DataFrame to JSON with specific orientation and line separation
             dataframe.to_json(f, orient='records', lines=True, force_ascii=False)
         
-        st.toast(f"File successfully saved to {file_path}.")
+        st.success(f"File successfully saved to {file_path}.")
     
     except Exception as e:
         # Catch any exception and show a message to the user
-        st.toast(f':red[Failed to save the file to {file_path}. Error: {str(e)}]', icon="🚨")
+        st.error(f':red[Failed to save the file to {file_path}. Error: {str(e)}]', icon="🚨")
 
 # @st.cache_data
 # def generate_top10_sponsor_plot(df, x:str, y:str):

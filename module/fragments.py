@@ -7,45 +7,69 @@ from module.utils import *
 from module.constants import *
 
 @st.fragment
-def medication_tirals(today:datetime):
-    columns = st.columns([2,1])
-    with st.spinner("Checking Updates..."):
-        conn = st.connection('gcs', type=FilesConnection)
+def home() -> None:
+    today = st.session_state['today']
+    conn = st.session_state['files_connection']
+    with st.status('Checking for updates...', expanded=True) as status:
         try:
             # Attempt to read the api_call_logs.json file from GCS
             api_call_logs_df = conn.read(f'{GCS_BUCKET_NAME}/api_call_logs.json', input_format='jsonl', dtype=str)
+            # Key Error Check
+            api_call_logs_df[['date', 'time']]
         except FileNotFoundError as e:
+            status.update(label='File not found', expanded=True, state='error')
             # If reading fails, create a new empty DataFrame
-            columns[0].warning(f"File read failed: {e}")
+            st.warning(f"File read failed: {e}")
             api_call_logs_df = pd.DataFrame(columns=['date', 'time'], dtype=str)
             # Save the empty DataFrame to GCS
             update_data(dataframe=api_call_logs_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/api_call_logs.json')
-            columns[0].warning(f"A new api call logs file has been created")
+            st.success(f"A new api call logs file has been created.")
+        except KeyError as e:
+            status.update(label='Key Error', expanded=True, state='error')
+            st.warning(f"Key Error: {e}")
+            api_call_logs_df = pd.DataFrame(columns=['date', 'time'], dtype=str)
+            # Save the empty DataFrame to GCS
+            update_data(dataframe=api_call_logs_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/api_call_logs.json')
+            st.success(f"A new api call logs file has been created.")
         
         # Check if today's date is missing from the DataFrame
-        if today.split('T')[0] not in api_call_logs_df['date'].values:
+        if today.split('T')[0] not in api_call_logs_df.loc[:, 'date'].values:
+            status.update(label='Fetching data for updates...', expanded=True)
             # Update Medication Trial Data
+            st.info('Updating Medication Trial Data...')
             fetched_medication_trial_df = fetch_medication_trial_data()
             update_data(dataframe=fetched_medication_trial_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/medication_trial_info.json')
+            st.success('Medication Trial Data Updated!')
+
+            # Update Device Trial Data
+            st.info('Updating Device Trial Data...')
+            fetched_device_trial_df = fetch_device_trial_data()
+            update_data(dataframe=fetched_device_trial_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/device_trial_info.json')
+            st.success('Device Trial Data Updated!')
 
             # Update API Call Logs with the current date and time
             max_row = api_call_logs_df.shape[0]
             api_call_logs_df.loc[max_row, 'date'] = today.split('T')[0]
-            api_call_logs_df.loc[max_row, 'time'] = today.split('T')[0]
+            api_call_logs_df.loc[max_row, 'time'] = today.split('T')[1]
             update_data(dataframe=api_call_logs_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/api_call_logs.json')
+            st.success('API Call Logs Updated!')
+            status.update(label='Data updated successfully!', expanded=False, state='complete')
         else:
-            columns[0].info('Every data is up to date!')
+            status.update(label='Every data is up to date!', expanded=False, state='complete')
 
+@st.fragment
+def medication_tirals() -> None:
+    conn = st.session_state['files_connection']
+    columns = st.columns([2,1])
+    columns[0].title(':blue[Medication] Clinical Trial Information :blue[Finder] (2012~)')
     medication_trial_df = conn.read(f'{GCS_BUCKET_NAME}/medication_trial_info.json', input_format='jsonl', dtype=str)
 
-    columns[0].dataframe(medication_trial_df)
-    
     # Calling API done
     st.session_state['medication_api'] = 'DONE'
 
     # Displaying the filter form
     if st.session_state['medication_api'] == 'DONE':
-        form = columns[0].form(key='filter_medication_trial')
+        form = columns[0].form(key='search_medication_trial')
         form_columns = form.columns(2)
         form_columns[0].text_input('Sponsor', key='sponsor', placeholder='삼진제약')
         form_columns[0].text_input(
@@ -56,7 +80,7 @@ def medication_tirals(today:datetime):
             placeholder='YYYYMMDD')
         form_columns[1].text_input('Site', key='site', placeholder='서울대학교병원')
         form_columns[1].text_input('Protocol Title', key='title', placeholder='급성')
-        submit_button = form.form_submit_button('Filter')
+        submit_button = form.form_submit_button('Search')
         
         if submit_button:
             with st.spinner():
@@ -65,21 +89,69 @@ def medication_tirals(today:datetime):
                 site = st.session_state['site']
                 title = st.session_state['title']
                 st.session_state['medication_trial_df'] = medication_trial_df[
-                    medication_trial_df['Sponsor'].str.contains(sponsor)
-                    &medication_trial_df['IND Approval Date'].str.contains(date)
-                    &medication_trial_df['Site Name'].str.contains(site)
-                    &medication_trial_df['Protocol Title'].str.contains(title)
+                    medication_trial_df['Sponsor'].str.contains(sponsor, case=False)
+                    &medication_trial_df['IND Approval Date'].str.contains(date, case=False)
+                    &medication_trial_df['Site Name'].str.contains(site, case=False)
+                    &medication_trial_df['Protocol Title'].str.contains(title, case=False)
                     ]
                 columns[0].dataframe(st.session_state['medication_trial_df'])
 
+                # Displaying the details button
+                columns[0].info('Only can search details data later then 2019')
+                medication_details()
+
 @st.fragment
-def medication_details():
+def medication_details() -> None:
     columns = st.columns([2,1])
-    details_button = columns[0].button('Search Details')
+    details_button = columns[0].button('View Details')
     if details_button:
         with st.spinner():
             medication_details_df = fetch_medication_details_data(dataframe=st.session_state['medication_trial_df'])
             columns[0].dataframe(medication_details_df)
+
+    return None
+
+def device_tirals() -> None:
+    conn = st.session_state['files_connection']
+    columns = st.columns([2,1])
+    columns[0].title(':green[device] Clinical Trial Information :green[Finder] (2003~)')
+    device_trial_df = conn.read(f'{GCS_BUCKET_NAME}/device_trial_info.json', input_format='jsonl', dtype=str)
+
+    # Cleaning device trail dataframe
+    device_trial_df.drop(columns=['Unknown'], inplace=True)
+    device_trial_df['IND Approval Date'] = device_trial_df['IND Approval Date'].str.replace('-', '')
+
+    # Calling API done
+    st.session_state['device_api'] = 'DONE'
+
+    if st.session_state['device_api'] == 'DONE':
+        form = columns[0].form(key='search_device_trial')
+        form_columns = form.columns(2)
+        form_columns[0].text_input('Manufacturer', key='manufacturer', placeholder='뷰노')
+        form_columns[0].text_input(
+            '''IND Approval Date (Available Input: :blue[YYYY] | 
+            :blue[YYYY]:orange[MM] | :blue[YYYY]:orange[MM]:green[DD])''', 
+            key='date', 
+            max_chars=8, 
+            placeholder='YYYYMMDD')
+        form_columns[1].text_input('Device ID', key='device_id', placeholder='D06080.01')
+        form_columns[1].text_input('Protocol Title', key='title', placeholder='파킨슨')
+        submit_button = form.form_submit_button('Search')
+
+        if submit_button:
+            with st.spinner():
+                manufacturer = st.session_state['manufacturer']
+                date = st.session_state['date']
+                device_id = st.session_state['device_id']
+                title = st.session_state['title']
+                st.session_state['device_trial_df'] = device_trial_df[
+                    device_trial_df['Manufacturer'].str.contains(manufacturer, case=False)
+                    &device_trial_df['IND Approval Date'].str.contains(date, case=False)
+                    &device_trial_df['Device ID'].str.contains(device_id, case=False)
+                    &device_trial_df['Protocol Title'].str.contains(title, case=False)
+                    ]
+                columns[0].dataframe(st.session_state['device_trial_df'])
+
 # @st.fragment
 # def medication_clinical_trial_search():
 #     st.title('Clinical Trial Information :blue[Finder]')
