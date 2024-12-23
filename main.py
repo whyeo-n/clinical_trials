@@ -20,12 +20,16 @@ if 'today' not in st.session_state:
     st.session_state['today'] = today
 if 'files_connection' not in st.session_state:
     st.session_state['files_connection'] = st.connection('gcs', type=FilesConnection)
+if 'fetch_data_result_dict' not in st.session_state:
+    st.session_state['fetch_data_result_dict'] = dict
 if 'medication_api' not in st.session_state:
     st.session_state['medication_api'] = 'INITIAL'
 if 'medication_detail_api' not in st.session_state:
     st.session_state['medication_detail_api'] = 'INITIAL'
 if 'medication_df' not in st.session_state:
     st.session_state['medication_df'] = pd.DataFrame
+if 'api_call_logs_df' not in st.session_state:
+    st.session_state['api_call_logs_df'] = pd.DataFrame
 if 'device_api' not in st.session_state:
     st.session_state['device_api'] = 'INITIAL'
 
@@ -35,8 +39,10 @@ pages = {
     'Medication Trials': medication_tirals, 
     'Device Trials': device_tirals,
     }
+
 with st.sidebar.title('Navigation') as sidebar:
     page = st.sidebar.radio('Go to', options=list(pages.keys()), index=0)
 
 # Pages
-pages[page]()
+with st.spinner('Loading...'):
+    pages[page]()

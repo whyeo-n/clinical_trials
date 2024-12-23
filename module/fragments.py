@@ -1,68 +1,79 @@
+import json
 from time import sleep
 from datetime import datetime
 
 import streamlit as st
+from langchain_google_vertexai import ChatVertexAI
+from google.oauth2 import service_account
 
 from module.utils import *
 from module.constants import *
 
+gcs_info = st.secrets.connections.gcs
+
+llm = ChatVertexAI(
+    project=gcs_info['project_id'],
+    model='gemini-1.5-flash-001',
+    temperature=0,
+    max_tokens=None,
+    max_retries=6,
+    stop=None,
+    credentials=service_account.Credentials.from_service_account_info(gcs_info),
+    # other params...
+)
+
 @st.fragment
 def home() -> None:
-    today = st.session_state['today']
-    conn = st.session_state['files_connection']
-    with st.status('Checking for updates...', expanded=True) as status:
-        try:
-            # Attempt to read the api_call_logs.json file from GCS
-            api_call_logs_df = conn.read(f'{GCS_BUCKET_NAME}/api_call_logs.json', input_format='jsonl', dtype=str)
-            # Key Error Check
-            api_call_logs_df[['date', 'time']]
-        except FileNotFoundError as e:
-            status.update(label='File not found', expanded=True, state='error')
-            # If reading fails, create a new empty DataFrame
-            st.warning(f"File read failed: {e}")
-            api_call_logs_df = pd.DataFrame(columns=['date', 'time'], dtype=str)
-            # Save the empty DataFrame to GCS
-            update_data(dataframe=api_call_logs_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/api_call_logs.json')
-            st.success(f"A new api call logs file has been created.")
-        except KeyError as e:
-            status.update(label='Key Error', expanded=True, state='error')
-            st.warning(f"Key Error: {e}")
-            api_call_logs_df = pd.DataFrame(columns=['date', 'time'], dtype=str)
-            # Save the empty DataFrame to GCS
-            update_data(dataframe=api_call_logs_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/api_call_logs.json')
-            st.success(f"A new api call logs file has been created.")
-        
+    # Set Layout
+    columns = st.columns([2, 1], vertical_alignment='top', border=False)
+    status = columns[0].status('Checking for updates...', expanded=True)
+    
+    logs_result, logs_e = check_api_call_logs()
+    if logs_result == Function_Status.FAIL:
+        status.error(f'API Call Log Check Failed: {str(logs_e)}]', icon='🚨')
+    elif logs_result == Function_Status.SUCCESS:
+        status.success(f'API Call Log Check Success!')
+
         # Check if today's date is missing from the DataFrame
-        if today.split('T')[0] not in api_call_logs_df.loc[:, 'date'].values:
-            status.update(label='Fetching data for updates...', expanded=True)
-            # Update Medication Trial Data
-            st.info('Updating Medication Trial Data...')
-            fetched_medication_trial_df = fetch_medication_trial_data()
-            update_data(dataframe=fetched_medication_trial_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/medication_trial_info.json')
-            st.success('Medication Trial Data Updated!')
-
-            # Update Device Trial Data
-            st.info('Updating Device Trial Data...')
-            fetched_device_trial_df = fetch_device_trial_data()
-            update_data(dataframe=fetched_device_trial_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/device_trial_info.json')
-            st.success('Device Trial Data Updated!')
-
-            # Update API Call Logs with the current date and time
-            max_row = api_call_logs_df.shape[0]
-            api_call_logs_df.loc[max_row, 'date'] = today.split('T')[0]
-            api_call_logs_df.loc[max_row, 'time'] = today.split('T')[1]
-            update_data(dataframe=api_call_logs_df, conn=conn, file_path=f'{GCS_BUCKET_NAME}/api_call_logs.json')
-            st.success('API Call Logs Updated!')
-            status.update(label='Data updated successfully!', expanded=False, state='complete')
+        if st.session_state['today'].split('T')[0] not in st.session_state['api_call_logs_df'].loc[:, 'date'].values:
+            # Fetching Data for update
+            fetch_data(st.session_state['files_connection'], st.session_state['api_call_logs_df'], st.session_state['today'], status)
+            if st.session_state['fetch_data_result_dict']['total_result'] == Function_Status.FAIL:
+                del st.session_state['fetch_data_result_dict']['total_result']
+                for result in st.session_state['fetch_data_result_dict'].keys():
+                    if st.session_state['fetch_data_result_dict'][result]['status'] == Function_Status.SUCCESS:
+                        status.success(st.session_state['fetch_data_result_dict'][result]['message'])
+                    elif st.session_state['fetch_data_result_dict'][result]['status'] == Function_Status.FAIL:
+                        status.error(st.session_state['fetch_data_result_dict'][result]['message'], icon='🚨')
+            else:
+                status.update(label='Update Success. Every data is up to date!', expanded=False, state='complete')
+            
         else:
-            status.update(label='Every data is up to date!', expanded=False, state='complete')
+            status.update(label=f'Already updated today. Every data is up to date!', expanded=False, state='complete')
+
+    if columns[1].button('Update Now'):
+        status.update('Update Now...', expanded=True)
+        # Fetching Data for update
+        fetch_data(st.session_state['files_connection'], st.session_state['api_call_logs_df'], st.session_state['today'], status)
+        if st.session_state['fetch_data_result_dict']['total_result'] == Function_Status.FAIL:
+            del st.session_state['fetch_data_result_dict']['total_result']
+            for result in st.session_state['fetch_data_result_dict'].keys():
+                if st.session_state['fetch_data_result_dict'][result]['status'] == Function_Status.SUCCESS:
+                    status.success(st.session_state['fetch_data_result_dict'][result]['message'])
+                elif st.session_state['fetch_data_result_dict'][result]['status'] == Function_Status.FAIL:
+                    status.error(st.session_state['fetch_data_result_dict'][result]['message'], icon='🚨')
+        else:
+            status.update(label='Update Success. Every data is up to date!', expanded=False, state='complete')
 
 @st.fragment
 def medication_tirals() -> None:
     conn = st.session_state['files_connection']
     columns = st.columns([2,1])
     columns[0].title(':blue[Medication] Clinical Trial Information :blue[Finder] (2012~)')
-    medication_trial_df = conn.read(f'{GCS_BUCKET_NAME}/medication_trial_info.json', input_format='jsonl', dtype=str)
+    tabs = columns[1].tabs(['Top 10 Sponsors', 'Top 10 Sites'])
+    medication_trial_json_bytes = conn.open(f'{GCS_BUCKET_NAME}/medication_trial_info.json', mode='rb')
+    medication_trial_list = decoding_json_bytes(medication_trial_json_bytes)
+    st.session_state['medication_trial_df'] = pd.DataFrame(medication_trial_list)
 
     # Calling API done
     st.session_state['medication_api'] = 'DONE'
@@ -83,39 +94,83 @@ def medication_tirals() -> None:
         submit_button = form.form_submit_button('Search')
         
         if submit_button:
-            with st.spinner():
-                sponsor = st.session_state['sponsor']
-                date = st.session_state['date']
-                site = st.session_state['site']
-                title = st.session_state['title']
-                st.session_state['medication_trial_df'] = medication_trial_df[
-                    medication_trial_df['Sponsor'].str.contains(sponsor, case=False)
-                    &medication_trial_df['IND Approval Date'].str.contains(date, case=False)
-                    &medication_trial_df['Site Name'].str.contains(site, case=False)
-                    &medication_trial_df['Protocol Title'].str.contains(title, case=False)
-                    ]
-                columns[0].dataframe(st.session_state['medication_trial_df'])
-
-                # Displaying the details button
-                columns[0].info('Only can search details data later then 2019')
+            with columns[0]:
                 medication_details()
+            with tabs[0]:
+                st.plotly_chart(top10_sponsors_plot(st.session_state['medication_trial_df']))
+            with tabs[1]:
+                st.plotly_chart(top10_sites_plot(st.session_state['medication_trial_df']))
 
+                # make it a fragment later
+                # medication_chatbot(st.session_state['medication_trial_df'])
+
+
+# @st.fragment
+# def medication_chatbot(medication_trial_df) -> None:
+#     # AI Chatbot
+#     st.title(':blue[AI] Chatbot')
+#     st.write('Ask me anything about the clinical trial information!')
+#     user_input = st.text_input('User Input', key='user_input')
+#     submit_button = st.button('Submit')
+
+#     if submit_button:
+#         with st.spinner():
+#             df_str = medication_trial_df.to_string()
+
+#             messages = [
+#                 (
+#                     'system',
+#                     '''You are a helpful assistant that summarize and answer questions about the clinical trial information.\n
+#                     [examples]\n
+#                     question: What is the most frequent indication in the clinical trial?\n
+#                     answer: The most frequent indication in the clinical trial is Parkinson's disease./n
+#                     answer (korean): 임상시험에서 가장 빈도가 높은 질병은 파킨슨병입니다.\n'''
+#                 ),
+#                 (
+#                     'user',
+#                     f'''{user_input}\n
+#                     dataframe: {df_str}'''
+#                 )
+#             ]
+
+#             response = llm.invoke(messages)
+#             st.write(response.content)
+#             # response = call_api_chatbot(user_input)
+#             # columns[1].write(response)
+
+    
 @st.fragment
 def medication_details() -> None:
-    columns = st.columns([2,1])
-    details_button = columns[0].button('View Details')
-    if details_button:
-        with st.spinner():
+    with st.spinner():
+        medication_trial_df = st.session_state['medication_trial_df']
+        sponsor = st.session_state['sponsor']
+        date = st.session_state['date']
+        site = st.session_state['site']
+        title = st.session_state['title']
+        st.session_state['medication_trial_df'] = medication_trial_df[
+            medication_trial_df['Sponsor'].str.contains(sponsor, case=False)
+            &medication_trial_df['IND Approval Date'].str.contains(date, case=False)
+            &medication_trial_df['Site'].str.contains(site, case=False)
+            &medication_trial_df['Protocol Title'].str.contains(title, case=False)
+            ]
+        st.dataframe(st.session_state['medication_trial_df'])
+        st.info('Only studies approved after 2019 can be viewed in detail.')
+
+        # Displaying the details button
+        if st.button('View Details'):
             medication_details_df = fetch_medication_details_data(dataframe=st.session_state['medication_trial_df'])
-            columns[0].dataframe(medication_details_df)
+            st.dataframe(medication_details_df)
 
     return None
 
 def device_tirals() -> None:
     conn = st.session_state['files_connection']
     columns = st.columns([2,1])
-    columns[0].title(':green[device] Clinical Trial Information :green[Finder] (2003~)')
-    device_trial_df = conn.read(f'{GCS_BUCKET_NAME}/device_trial_info.json', input_format='jsonl', dtype=str)
+    columns[0].title(':green[Device] Clinical Trial Information :green[Finder] (2003~)')
+    # device_trial_df = conn.read(f'{GCS_BUCKET_NAME}/device_trial_info.json', input_format='jsonl', encoding='utf-8', dtype=str)
+    device_trial_json_bytes = conn.open(f'{GCS_BUCKET_NAME}/device_trial_info.json', mode='rb')
+    device_trial_list = decoding_json_bytes(device_trial_json_bytes)
+    device_trial_df = pd.DataFrame(device_trial_list)
 
     # Cleaning device trail dataframe
     device_trial_df.drop(columns=['Unknown'], inplace=True)
@@ -206,7 +261,7 @@ def device_tirals() -> None:
 
 #             # Download Button
 #             columns[0].download_button(
-#                 label="Download",
+#                 label='Download',
 #                 key='clinical_trial_info_download_button',
 #                 data=convert_df(dataframe),
 #                 file_name=f'clinical_trial_info.xlsx',
@@ -260,7 +315,7 @@ def device_tirals() -> None:
 #         form.dataframe(details_dataframe.reset_index(drop=True))
 #         st.download_button(
 #             label='Download',
-#             key="clinical_trial_details_info_excel_download_button",
+#             key='clinical_trial_details_info_excel_download_button',
 #             data=convert_df(details_dataframe),
 #             file_name=f'clinical_trial_details_info.xlsx',
 #             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -311,7 +366,7 @@ def device_tirals() -> None:
 
 #             st.download_button(
 #                 label='Download',
-#                 key="clinical_trial_details_info_excel_download_button",
+#                 key='clinical_trial_details_info_excel_download_button',
 #                 data=convert_df(dataframe.sort_values('Approval Date', ascending=False)),
 #                 file_name=f'clinical_trial_details_info.xlsx',
 #                 mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

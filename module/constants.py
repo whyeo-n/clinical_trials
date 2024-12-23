@@ -1,5 +1,7 @@
+from enum import Enum
+
 MEDICATION_STUDY_COLUMN_NAME = [
-    'Sponsor', 'IND Approval Date', 'Site Name', 'IP Name', 
+    'Sponsor', 'IND Approval Date', 'Site', 'IP Name', 
     'Protocol Title', 'Phase', 'Clinical Trial ID'
 ]
 MEDICATION_STUDY_DETAILS_COLUMN_NAME = [
@@ -32,3 +34,7 @@ MEDICAL_DEVICE_STUDY_COLUMN_NAME = [
 ]
 
 GCS_BUCKET_NAME = 'streamlit-mfds-clinical-trials'
+
+class Function_Status(Enum):
+    SUCCESS = 'SUCCESS'
+    FAIL = 'FAIL'
