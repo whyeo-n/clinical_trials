@@ -37,6 +37,9 @@ def get_request(url: str, params: dict) -> dict:
     return None
 
 def check_api_call_logs():
+    '''Check the api_coll_logs.json is valid and can be connected.
+    If not, make a new one.'''
+
     try:
         # Attempt to read the api_call_logs.json file from GCS
         st.session_state['api_call_logs_df'] = st.session_state['files_connection'].read(f'{GCS_BUCKET_NAME}/api_call_logs.json', input_format='jsonl', dtype=str)
@@ -115,6 +118,7 @@ def fetch_data(conn:FilesConnection, api_call_logs_df:pd.DataFrame, today:dateti
 
 def fetch_medication_trial_data(status):
     '''Fetch and return all medication trial data from the API.'''
+
     url = f'{BASE_URL}/MdcinClincTestInfoService02/getMdcinClincTestInfoList02'
 
     # Set up the parameters for the request
@@ -171,6 +175,7 @@ def fetch_medication_trial_data(status):
 
 def decoding_json_bytes(json_file: GCSFile) -> list:
     '''Decode the JSON bytes and return the list of JSON objects.'''
+
     json_bytes = f'[{json_file.read().decode('utf-8').replace('}\n{', '},{')}]'
     
     return json.loads(json_bytes)
@@ -287,6 +292,8 @@ def update_data(dataframe: pd.DataFrame, conn: FilesConnection, file_path: str) 
 
 @st.cache_data
 def make_plot(dataframe: pd.DataFrame, x: str, y: str):
+    '''Make a plotly horizontal bar fig with highlight Top Data'''
+
     colors = ['lightgray' if count != max(dataframe[x]) else '#ffaa00' for count in dataframe[x]]
     fig = px.bar(
         dataframe,
@@ -302,9 +309,10 @@ def make_plot(dataframe: pd.DataFrame, x: str, y: str):
 
     return fig
 
-
 @st.cache_data
 def top10_sponsors_plot(dataframe: pd.DataFrame):
+    '''Make a plot about top 10 sponsors about filtered medication data.'''
+
     x='Count'
     y='Sponsor'
     dataframe = dataframe.groupby(y, as_index=False)['Protocol Title'].count()
@@ -315,6 +323,7 @@ def top10_sponsors_plot(dataframe: pd.DataFrame):
 
 @st.cache_data
 def top10_sites_plot(dataframe: pd.DataFrame):
+    '''Make a plot about top 10 sites about filtered medication data.'''
     x='Count'
     y='Site'
     dataframe = dataframe[y].str.split(' :', expand=True).melt().dropna()
@@ -324,132 +333,13 @@ def top10_sites_plot(dataframe: pd.DataFrame):
 
     return make_plot(dataframe, x, y)
     
-    # df = df.groupby(y, as_index=False).count()[[y, 'Protocol Title']].nlargest(10, 'Protocol Title').sort_values('Protocol Title', ascending=True)
-    # colors =  ['lightgray' if count != max(df['Protocol Title']) else '#ffaa00' for count in df['Protocol Title']]
-    # fig = px.bar(
-    #     df,
-    #     title='Top 10 Sponsors',
-    #     x=x,
-    #     y=y,
-    #     orientation='h',
-    # )
-
-    # fig.update_xaxes(dtick=ceil(df['Protocol Title'].max()/10))
-    # fig.update_traces(marker=dict(color=colors))
-    # fig.update_layout(xaxis_title='', yaxis_title='')
-
-    # return fig
-
 @st.cache_data
-def generate_top10_site_plot(df, x: str, y: str):
-    df = df['Site Name'].str.split(' :', expand=True).melt().dropna().value_counts('value').to_frame().reset_index().nlargest(10, 'count').sort_values('count', ascending=True)
-    colors =  ['lightgray' if count != max(df['count']) else '#ffaa00' for count in df['count']]
-    fig = px.bar(
-        df,
-        title='Top 10 Site',
-        x=x,
-        y=y,
-        orientation='h',
-    )
+def top10_Manufacturer_plot(dataframe: pd.DataFrame):
+    '''Make a plot about top 10 manufacturer about filtered device data.'''
+    x='Count'
+    y='Manufacturer'
+    dataframe = dataframe.groupby(y, as_index=False)['Protocol Title'].count()
+    dataframe.columns = [y, x]
+    dataframe = dataframe.nlargest(n=10, columns=x).sort_values(x)
 
-    fig.update_xaxes(dtick=ceil(df['count'].max()/10))
-    fig.update_traces(marker=dict(color=colors))
-    fig.update_layout(xaxis_title='', yaxis_title='')
-
-    return fig
-
-# @st.cache_data
-# def generate_top10_developer_plot(df, x:str, y: str):
-#     df = df[y].value_counts().to_frame().reset_index().nlargest(10, 'count').sort_values('count', ascending=True)
-#     colors =  ['lightgray' if count != max(df['count']) else '#ffaa00' for count in df['count']]
-#     fig = px.bar(
-#         df,
-#         title='Top 10 Developer',
-#         x=x,
-#         y=y,
-#         orientation='h',
-#     )
-
-#     fig.update_xaxes(dtick=ceil(df['count'].max()/10))
-#     fig.update_traces(marker=dict(color=colors))
-#     fig.update_layout(xaxis_title='', yaxis_title='')
-
-#     return fig
-
-# @st.cache_data
-# def generate_top10_disease_plot(df):
-#     df = df['Target Disease Category'].value_counts().to_frame().reset_index().nlargest(10, 'count').sort_values('count', ascending=True)
-#     colors =  ['lightgray' if count != max(df['count']) else '#ffaa00' for count in df['count']]
-#     fig = px.bar(
-#         df,
-#         title='Top 10 Developer',
-#         x='count',
-#         y='Target Disease Category',
-#         orientation='h',
-#     )
-
-#     fig.update_xaxes(dtick=ceil(df['count'].max()/10))
-#     fig.update_traces(marker=dict(color=colors))
-#     fig.update_layout(xaxis_title='', yaxis_title='')
-
-#     return fig
-
-# def call_api_MdcinClincTestInfoService02(initial:bool=False, iter:int=1):
-#     url = BASE_URL + '/MdcinClincTestInfoService02/getMdcinClincTestInfoList02'
-#     params = {
-#         'serviceKey': st.secrets['DECODED_API_KEY'],
-#         'clinic_exam_title': st.session_state.get('title', ''),
-#         'pageNo': 1,
-#         'numOfRows': NUM_OF_ROWS,
-#         'type': 'json',
-#         'approval_time': st.session_state.get('date', ''),
-#         }
-
-#     if initial:
-#         response_body_dict = get_request(url, params=params)
-
-#     else:
-#         params['pageNo'] = iter
-#         response_body_dict = get_request(url, params=params)
-
-#     return response_body_dict
-
-# def call_api_ClncExamPlanDtlService2(clinical_study_id:str):
-#     url = BASE_URL + '/ClncExamPlanDtlService2/getClncExamPlanDtlInq2'
-#     params = {
-#         'serviceKey': st.secrets['DECODED_API_KEY'],
-#         'pageNo': 1,
-#         'numOfRows': 100,
-#         'type': 'json',
-#         'CLNC_TEST_SN': clinical_study_id
-#         }
-
-#     response_body_dict = get_request(url, params=params)
-
-#     return response_body_dict
-
-
-# def call_api_MdeqClncTestPlanAprvAplyDtlService01(initial:bool=False, iter:int=1):
-#     url = BASE_URL + '/MdeqClncTestPlanAprvAplyDtlService01/getMdeqClncTestPlanAprvAplyDtlInq01'
-#     # url = BASE_URL + '/MdeqClncTestPlanAprvAplyListService/getMdeqClncTestPlanAprvAplyListInq'
-#     if initial:
-#         params = {
-#             'serviceKey': st.secrets['DECODED_API_KEY'],
-#             'pageNo': 1,
-#             'numOfRows': 100,
-#             'type': 'json',
-#             }
-        
-#         return get_request(url, params=params)
-        
-#     else:
-#         params = {
-#             'serviceKey': st.secrets['DECODED_API_KEY'],
-#             'pageNo': iter,
-#             'numOfRows': 100,
-#             'type': 'json',
-#             }
-
-#         return get_request(url, params=params)
-    
-
+    return make_plot(dataframe, x, y)
