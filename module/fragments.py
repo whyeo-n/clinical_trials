@@ -48,7 +48,7 @@ def home() -> None:
             status.update(label=f'Already updated today. Every data is up to date!', expanded=False, state='complete')
 
     if columns[1].button('Update Now'):
-        status.update('Update Now...', expanded=True)
+        status.update(label='Update Now...', expanded=True)
         # Fetching Data for update
         fetch_data(st.session_state['files_connection'], st.session_state['api_call_logs_df'], st.session_state['today'], status)
         if st.session_state['fetch_data_result_dict']['total_result'] == Function_Status.FAIL:
