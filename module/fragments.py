@@ -66,14 +66,18 @@ def home() -> None:
             status.update(label='Update Success. Every data is up to date!', expanded=False, state='complete')
 
 @st.fragment
-def medication_tirals() -> None:
+def medication_tirals_page() -> None:
+
+
+
+    
     conn = st.session_state['files_connection']
     columns = st.columns([2,1])
     columns[0].title(':blue[Medication] Clinical Trial Information :blue[Finder] (2012~)')
     tabs = columns[1].tabs(['Top 10 Sponsors', 'Top 10 Sites'])
     medication_trial_json_bytes = conn.open(f'{GCS_BUCKET_NAME}/medication_trial_info.json', mode='rb')
     medication_trial_list = decoding_json_bytes(medication_trial_json_bytes)
-    st.session_state['medication_trial_df'] = pd.DataFrame(medication_trial_list)
+    st.session_state['medication_df'] = pd.DataFrame(medication_trial_list)
 
     # Calling API done
     st.session_state['medication_api'] = 'DONE'
@@ -91,22 +95,26 @@ def medication_tirals() -> None:
             placeholder='YYYYMMDD')
         form_columns[1].text_input('Site', key='site', placeholder='서울대학교병원')
         form_columns[1].text_input('Protocol Title', key='title', placeholder='급성')
-        submit_button = form.form_submit_button('Search')
         
-        if submit_button:
+        # Filtering Dataframe
+        if form.form_submit_button('Search'):
             with columns[0]:
-                medication_details()
-            with tabs[0]:
-                st.plotly_chart(top10_sponsors_plot(st.session_state['medication_trial_df']))
-            with tabs[1]:
-                st.plotly_chart(top10_sites_plot(st.session_state['medication_trial_df']))
+                medication_filtered_df = st.session_state['medication_df'].copy()
+                medication_filtered_df = medication_filtered_df[
+                    medication_filtered_df['Sponsor'].str.contains(st.session_state['sponsor'], case=False)
+                    &medication_filtered_df['IND Approval Date'].str.contains(st.session_state['date'], case=False)
+                    &medication_filtered_df['Site'].str.contains(st.session_state['site'], case=False)
+                    &medication_filtered_df['Protocol Title'].str.contains(st.session_state['title'], case=False)
+                    ]
+                st.session_state['medication_filtered_df'] = medication_filtered_df
+                st.dataframe(st.session_state['medication_filtered_df'])
 
-                # make it a fragment later
-                # medication_chatbot(st.session_state['medication_trial_df'])
-
+            # Empty Check
+            if not st.session_state['medication_filtered_df'].empty:
+                st.info('Only studies approved after 2019 can be viewed in detail.')
 
 # @st.fragment
-# def medication_chatbot(medication_trial_df) -> None:
+# def medication_chatbot(medication_df) -> None:
 #     # AI Chatbot
 #     st.title(':blue[AI] Chatbot')
 #     st.write('Ask me anything about the clinical trial information!')
@@ -115,7 +123,7 @@ def medication_tirals() -> None:
 
 #     if submit_button:
 #         with st.spinner():
-#             df_str = medication_trial_df.to_string()
+#             df_str = medication_df.to_string()
 
 #             messages = [
 #                 (
@@ -141,27 +149,16 @@ def medication_tirals() -> None:
     
 @st.fragment
 def medication_details() -> None:
-    with st.spinner():
-        medication_trial_df = st.session_state['medication_trial_df']
-        sponsor = st.session_state['sponsor']
-        date = st.session_state['date']
-        site = st.session_state['site']
-        title = st.session_state['title']
-        st.session_state['medication_trial_df'] = medication_trial_df[
-            medication_trial_df['Sponsor'].str.contains(sponsor, case=False)
-            &medication_trial_df['IND Approval Date'].str.contains(date, case=False)
-            &medication_trial_df['Site'].str.contains(site, case=False)
-            &medication_trial_df['Protocol Title'].str.contains(title, case=False)
-            ]
-        st.dataframe(st.session_state['medication_trial_df'])
-        st.info('Only studies approved after 2019 can be viewed in detail.')
+    # Displaying the details button
+    with tabs[0]:
+        st.plotly_chart(top10_sponsors_plot(st.session_state['medication_filtered_df']))
+    with tabs[1]:
+        st.plotly_chart(top10_sites_plot(st.session_state['medication_filtered_df']))
+    if st.button('View Details'):
+        medication_details_df = fetch_medication_details_data(dataframe=st.session_state['medication_filtered_df'])
+        st.dataframe(medication_details_df)
 
-        # Displaying the details button
-        if st.button('View Details'):
-            medication_details_df = fetch_medication_details_data(dataframe=st.session_state['medication_trial_df'])
-            st.dataframe(medication_details_df)
-
-    return None
+        return None
 
 def device_tirals() -> None:
     conn = st.session_state['files_connection']
