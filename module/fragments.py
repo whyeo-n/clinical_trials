@@ -1,22 +1,22 @@
 import streamlit as st
-from langchain_google_vertexai import ChatVertexAI
-from google.oauth2 import service_account
+# from langchain_google_vertexai import ChatVertexAI
+# from google.oauth2 import service_account
 
 from module.utils import *
 from module.constants import *
 
 gcs_info = st.secrets.connections.gcs
 
-llm = ChatVertexAI(
-    project=gcs_info['project_id'],
-    model='gemini-1.5-flash-001',
-    temperature=0,
-    max_tokens=None,
-    max_retries=6,
-    stop=None,
-    credentials=service_account.Credentials.from_service_account_info(gcs_info),
-    # other params...
-)
+# llm = ChatVertexAI(
+#     project=gcs_info['project_id'],
+#     model='gemini-1.5-flash-001',
+#     temperature=0,
+#     max_tokens=None,
+#     max_retries=6,
+#     stop=None,
+#     credentials=service_account.Credentials.from_service_account_info(gcs_info),
+#     # other params...
+# )
 
 @st.fragment
 def home() -> None:
